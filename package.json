@@ -1,0 +1,19 @@
+{
+  "name": "openclaw-backup-tool",
+  "version": "1.0.0",
+  "description": "Lightweight, highly configurable backup tool for OpenClaw",
+  "type": "module",
+  "bin": {
+    "backup": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "ignore": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
