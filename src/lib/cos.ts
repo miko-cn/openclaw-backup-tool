@@ -124,7 +124,7 @@ export async function uploadToCOS(
       {
         ...bucketConfig,
         Key: remotePath,
-        FilePath: localFile,
+        Body: require("fs").createReadStream(localFile),
       },
       (err, data) => {
         if (err) {
