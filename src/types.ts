@@ -12,6 +12,7 @@ export interface BackupConfig {
     targets: BackupTarget[];
     outputDir: string;
     compression: boolean;
+    globalExcludes?: string[];
   };
   retention: {
     type: "count" | "days" | "both";
@@ -30,6 +31,7 @@ export interface TemplateDefinition {
 export interface CliOptions {
   config?: string;
   template?: string;
+  suffix?: string;
   dryRun?: boolean;
 }
 
@@ -49,4 +51,14 @@ export interface BackupRecord {
   createdAt: Date;
   sizeBytes: number;
   template: string;
+}
+
+// 验证结果
+export interface VerifyResult {
+  success: boolean;
+  files?: number;
+  size?: number;
+  error?: string;
+  missingFiles?: string[];  // 遗漏的文件（应该备份但没有的）
+  extraFiles?: string[];   // 额外的文件（不该有但有的）
 }

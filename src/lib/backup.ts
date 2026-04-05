@@ -23,7 +23,10 @@ function formatTimestamp(date: Date): string {
   return `${y}${m}${d}-${h}${min}${s}`;
 }
 
-function getBackupFilename(template: string, timestamp: string): string {
+function getBackupFilename(template: string, timestamp: string, suffix?: string): string {
+  if (suffix) {
+    return `openclaw-backup-${template}-${suffix}-${timestamp}.tar.gz`;
+  }
   return `openclaw-backup-${template}-${timestamp}.tar.gz`;
 }
 
@@ -89,7 +92,8 @@ function walkDir(dir: string): string[] {
 
 export async function runBackup(
   config: BackupConfig,
-  templateName?: string
+  templateName?: string,
+  suffix?: string
 ): Promise<BackupResult> {
   const outputDir = expandTilde(config.backup.outputDir);
 
@@ -123,7 +127,7 @@ export async function runBackup(
   }
 
   // 创建文件过滤器
-  const filter = createMultiTargetFilter(targets);
+  const filter = createMultiTargetFilter(targets, config.backup.globalExcludes);
 
   // 收集要备份的文件
   const filesToBackup: string[] = [];
@@ -155,7 +159,7 @@ export async function runBackup(
   // 生成备份文件名
   const timestamp = formatTimestamp(new Date());
   const template = templateName || targets[0].name || "custom";
-  const backupFilename = getBackupFilename(template, timestamp);
+  const backupFilename = getBackupFilename(template, timestamp, suffix);
   const backupPath = join(outputDir, backupFilename);
 
   console.log(`[${timestamp}] INFO: Starting backup...`);
@@ -164,17 +168,27 @@ export async function runBackup(
     `[${timestamp}] INFO: Compressing... (${filesToBackup.length} files)`
   );
 
-  // 使用 tar 打包
-  const parentDir = expandTilde(targets[0].path).replace(basename(expandTilde(targets[0].path)), "");
-  const dirName = basename(expandTilde(targets[0].path));
+  // 使用 tar 打包多个目录
+  // tar -czf backup.tar.gz -C /parent1 dir1 -C /parent2 dir2 ...
+  const tarArgs: string[] = ["-czf", backupPath];
   
-  const tarProcess = spawn("tar", [
-    "-czf",
-    backupPath,
-    "-C",
-    parentDir,
-    dirName,
-  ]);
+  // 添加全局排除（tar 原生支持）
+  if (config.backup.globalExcludes) {
+    for (const pattern of config.backup.globalExcludes) {
+      tarArgs.push("--exclude", pattern);
+    }
+  }
+  
+  for (const target of targets) {
+    const targetPath = expandTilde(target.path);
+    if (existsSync(targetPath)) {
+      const parentDir = targetPath.replace(basename(targetPath), "");
+      const dirName = basename(targetPath);
+      tarArgs.push("-C", parentDir, dirName);
+    }
+  }
+
+  const tarProcess = spawn("tar", tarArgs);
 
   return new Promise((resolve) => {
     tarProcess.on("close", (code) => {

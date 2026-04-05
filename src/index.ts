@@ -4,12 +4,16 @@ import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { runClean } from "./commands/clean.js";
 import { runBackup } from "./commands/run.js";
+import { runVerify } from "./commands/verify.js";
+import { runSync } from "./commands/sync.js";
 
 const commands = {
   init: "Initialize backup configuration",
   run: "Run backup",
   list: "List all backups",
   clean: "Clean old backups",
+  verify: "Verify a backup file",
+  sync: "Sync backups to COS with retention",
 };
 
 async function main() {
@@ -42,13 +46,17 @@ async function main() {
     options: {
       config: { type: "string", short: "c" },
       template: { type: "string", short: "t" },
+      suffix: { type: "string" },
+      target: { type: "string" },
       "dry-run": { type: "boolean" },
     },
+    allowPositionals: true,
   });
 
   const options = {
     config: parsed.values.config,
     template: parsed.values.template,
+    suffix: parsed.values.suffix,
     dryRun: parsed.values["dry-run"],
   };
 
@@ -65,6 +73,17 @@ async function main() {
       break;
     case "clean":
       await runClean(options);
+      break;
+    case "verify":
+      if (!parsed.positionals || !parsed.positionals[0]) {
+        console.error("Error: backup file path required");
+        console.log("Usage: backup verify <file.tar.gz>");
+        process.exit(1);
+      }
+      await runVerify(parsed.positionals[0]);
+      break;
+    case "sync":
+      await runSync(args.slice(1));
       break;
   }
 }

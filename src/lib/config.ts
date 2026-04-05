@@ -3,7 +3,7 @@ import { resolve } from "path";
 import type { BackupConfig, TemplateDefinition } from "./types.js";
 
 // 展开 ~ 为用户家目录
-function expandTilde(path: string): string {
+export function expandTilde(path: string): string {
   if (path.startsWith("~")) {
     const home = process.env.HOME || process.env.USERPROFILE || "/root";
     return path.replace("~", home);
@@ -12,6 +12,7 @@ function expandTilde(path: string): string {
 }
 
 const DEFAULT_OUTPUT_DIR = expandTilde("~/.openclaw/backups");
+const DEFAULT_CONFIG_PATH = expandTilde("~/.openclaw/backups/backup.config.json");
 
 const DEFAULT_CONFIG: BackupConfig = {
   version: "1.0.0",
@@ -19,6 +20,14 @@ const DEFAULT_CONFIG: BackupConfig = {
     targets: [],
     outputDir: DEFAULT_OUTPUT_DIR,
     compression: true,
+    globalExcludes: [
+      "**/node_modules/**/*",
+      "**/.git/**/*",
+      "**/*.log",
+      "**/dist/**/*",
+      "**/build/**/*",
+      "**/.cache/**/*",
+    ],
   },
   retention: {
     type: "count",
@@ -45,12 +54,15 @@ const DEFAULT_CONFIG: BackupConfig = {
 };
 
 export function loadConfig(configPath?: string): BackupConfig {
-  // 如果没有指定配置，返回默认配置
-  if (!configPath) {
+  // 如果没有指定配置，优先使用默认配置文件
+  const configFilePath = configPath || (existsSync(DEFAULT_CONFIG_PATH) ? DEFAULT_CONFIG_PATH : undefined);
+
+  // 如果没有配置文件，返回默认配置
+  if (!configFilePath) {
     return DEFAULT_CONFIG;
   }
 
-  const resolvedPath = resolve(configPath);
+  const resolvedPath = resolve(configFilePath);
 
   if (!existsSync(resolvedPath)) {
     console.warn(`Config file not found: ${resolvedPath}, using default.`);

@@ -63,17 +63,26 @@ function scanGitignores(rootDir: string): Map<string, Ignore> {
 }
 
 // 创建文件过滤器
-export function createFileFilter(target: BackupTarget): FileFilter {
+// globalExcludes: 全局排除规则，应用到所有目标
+export function createFileFilter(target: BackupTarget, globalExcludes?: string[]): FileFilter {
   const targetPath = expandTilde(target.path);
   
   // 扫描所有 .gitignore 并缓存
   const gitignoreMap = scanGitignores(targetPath);
 
-  // 添加 excludes 规则（用户配置的）
-  let excludesIg: Ignore | null = null;
+  // 合并全局 excludes 和目标自己的 excludes
+  const allExcludes: string[] = [];
+  if (globalExcludes && globalExcludes.length > 0) {
+    allExcludes.push(...globalExcludes);
+  }
   if (target.excludes && target.excludes.length > 0) {
+    allExcludes.push(...target.excludes);
+  }
+
+  let excludesIg: Ignore | null = null;
+  if (allExcludes.length > 0) {
     excludesIg = createIgnore();
-    for (const pattern of target.excludes) {
+    for (const pattern of allExcludes) {
       excludesIg.add(pattern);
     }
   }
@@ -112,10 +121,12 @@ export function createFileFilter(target: BackupTarget): FileFilter {
 }
 
 // 从多个目标创建聚合过滤器
+// globalExcludes: 全局排除规则，应用到所有目标
 export function createMultiTargetFilter(
-  targets: BackupTarget[]
+  targets: BackupTarget[],
+  globalExcludes?: string[]
 ): FileFilter {
-  const filters = targets.map((t) => createFileFilter(t));
+  const filters = targets.map((t) => createFileFilter(t, globalExcludes));
 
   return {
     isIncluded: (filePath: string) => {
