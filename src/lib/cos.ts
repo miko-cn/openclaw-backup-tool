@@ -1,40 +1,74 @@
 import COS from "cos-nodejs-sdk-v5";
 import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve } from "path";
 
 // 读取环境变量配置
+// 优先级：1. 进程环境变量 2. ~/.bashrc 3. ~/.zshrc 4. ~/.openclaw/.env
 function loadCosConfig() {
-  const envPath = resolve(process.env.HOME || "/root", ".openclaw/.env");
-  
-  const config = {
-    secretId: process.env.COS_SECRET_ID,
-    secretKey: process.env.COS_SECRET_KEY,
-    bucket: process.env.COS_BUCKET,
-    region: process.env.COS_REGION,
+  // 1. 先尝试进程环境变量
+  let config = {
+    secretId: process.env.TENCENT_COS_SECRET_ID || process.env.COS_SECRET_ID,
+    secretKey: process.env.TENCENT_COS_SECRET_KEY || process.env.COS_SECRET_KEY,
+    bucket: process.env.TENCENT_COS_BUCKET || process.env.COS_BUCKET,
+    region: process.env.TENCENT_COS_REGION || process.env.COS_REGION,
   };
 
-  // 如果 .env 文件存在，也从其中读取
-  if (existsSync(envPath)) {
-    try {
-      const envContent = readFileSync(envPath, "utf-8");
-      const envVars: Record<string, string> = {};
-      
-      for (const line of envContent.split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith("#")) {
-          const [key, ...valueParts] = trimmed.split("=");
-          if (key && valueParts.length > 0) {
-            envVars[key.trim()] = valueParts.join("=").trim();
+  // 如果进程环境变量没有，尝试从 shell 配置文件读取
+  if (!config.secretId) {
+    const shellFiles = [
+      resolve(process.env.HOME || "/root", ".bashrc"),
+      resolve(process.env.HOME || "/root", ".zshrc"),
+    ];
+
+    for (const file of shellFiles) {
+      if (existsSync(file)) {
+        try {
+          const content = readFileSync(file, "utf-8");
+          // 解析 export TENCENT_COS_*=xxx
+          const lines = content.split("\n");
+          for (const line of lines) {
+            const match = line.match(/^export\s+TENCENT_COS_(\w+)=["']?([^"'\n]+)["']?/);
+            if (match) {
+              const [, key, value] = match;
+              if (key === "SECRET_ID") config.secretId = value;
+              if (key === "SECRET_KEY") config.secretKey = value;
+              if (key === "REGION") config.region = value;
+              if (key === "BUCKET") config.bucket = value;
+            }
           }
+          if (config.secretId) break; // 找到就退出
+        } catch (e) {
+          // 忽略
         }
       }
-      
-      if (envVars.COS_SECRET_ID) config.secretId = envVars.COS_SECRET_ID;
-      if (envVars.COS_SECRET_KEY) config.secretKey = envVars.COS_SECRET_KEY;
-      if (envVars.COS_BUCKET) config.bucket = envVars.COS_BUCKET;
-      if (envVars.COS_REGION) config.region = envVars.COS_REGION;
-    } catch (e) {
-      // 忽略读取错误
+    }
+  }
+
+  // 2. 如果还没有，从 .env 读取作为备选
+  if (!config.secretId) {
+    const envPath = resolve(process.env.HOME || "/root", ".openclaw/.env");
+    if (existsSync(envPath)) {
+      try {
+        const envContent = readFileSync(envPath, "utf-8");
+        const envVars: Record<string, string> = {};
+        
+        for (const line of envContent.split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#")) {
+            const [key, ...valueParts] = trimmed.split("=");
+            if (key && valueParts.length > 0) {
+              envVars[key.trim()] = valueParts.join("=").trim();
+            }
+          }
+        }
+        
+        if (envVars.TENCENT_COS_SECRET_ID) config.secretId = envVars.TENCENT_COS_SECRET_ID;
+        if (envVars.TENCENT_COS_SECRET_KEY) config.secretKey = envVars.TENCENT_COS_SECRET_KEY;
+        if (envVars.TENCENT_COS_BUCKET) config.bucket = envVars.TENCENT_COS_BUCKET;
+        if (envVars.TENCENT_COS_REGION) config.region = envVars.TENCENT_COS_REGION;
+      } catch (e) {
+        // 忽略
+      }
     }
   }
 
